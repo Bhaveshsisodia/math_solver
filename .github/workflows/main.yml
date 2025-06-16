@@ -25,9 +25,8 @@ jobs:
           git clone https://huggingface.co/spaces/itsbhavesh123/Math_Solver hf_space
           
           # rsync with --delete but ignore exit code 24 (vanishing files)
-          rsync -av --delete --exclude='.git' ./ hf_space/ || [[ $? == 24 ]]
-          
-          cd hf_space
+          rsync -av --delete --exclude='.git' .|| [[ $? == 24 ]]
+
           git add .
           git commit -m "🚀 Auto Deploy from GitHub Actions" || echo "Nothing to commit"
           git push https://user:$HF_TOKEN@huggingface.co/spaces/itsbhavesh123/Math_Solver main
