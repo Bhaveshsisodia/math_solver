@@ -18,31 +18,21 @@ jobs:
           git config --global i18n.commitEncoding utf-8
           git config --global i18n.logOutputEncoding utf-8
 
-      - name: Initialize Git for Hugging Face Repo
+      - name: Clone Hugging Face Space Repo to temp folder
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Prepare a clean git repo in a temp folder
-          mkdir hf_temp
-          cd hf_temp
-          git init
-          git remote add origin https://user:$HF_TOKEN@huggingface.co/spaces/itsbhavesh123/Math_Solver
-          git fetch origin main || echo "No remote branch yet"
-          git reset --hard origin/main || echo "Nothing to reset"
-          git rm -rf . || true
-          rm -rf * .[^.]* || true
-          git clean -fdx || true
+          git clone https://user:$HF_TOKEN@huggingface.co/spaces/itsbhavesh123/Math_Solver hf_repo
 
-      - name: Copy GitHub Repo Files to Hugging Face Repo
+      - name: Copy Files from GitHub Repo to Hugging Face Repo
         run: |
-          rsync -av --delete --exclude='.git' --exclude='.github' ./ hf_temp/ || [[ $? == 24 ]]
+          rsync -av --delete --exclude='.git' --exclude='.github' ./ hf_repo/ || [[ $? == 24 ]]
 
-      - name: Commit & Push to Hugging Face (Clean State)
+      - name: Commit and Push to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          cd hf_temp
+          cd hf_repo
           git add .
-          git commit -m "✨ Clean deploy from GitHub Actions" || echo "Nothing to commit"
-          git branch -M main
-          git push -f https://user:$HF_TOKEN@huggingface.co/spaces/itsbhavesh123/Math_Solver main
+          git commit -m "🚀 Auto Deploy from GitHub Actions" || echo "Nothing to commit"
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/itsbhavesh123/Math_Solver main
