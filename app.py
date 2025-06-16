@@ -7,7 +7,6 @@ from langchain.agents import Tool, initialize_agent
 from langchain.agents.agent_types import AgentType
 
 
-#bhavesh
 # Initialize global variables
 llm = None
 assistant_agent = None
