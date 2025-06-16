@@ -1,108 +1,90 @@
-import streamlit as st
+import gradio as gr
 from langchain_groq import ChatGroq
 from langchain.chains import LLMMathChain, LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_community.utilities import WikipediaAPIWrapper
-from langchain.agents.agent_types import AgentType
 from langchain.agents import Tool, initialize_agent
-from langchain.callbacks import StreamlitCallbackHandler
+from langchain.agents.agent_types import AgentType
 
-## Set upi the Stramlit app
-st.set_page_config(page_title="Text To MAth Problem Solver And Data Serach Assistant",page_icon="🧮")
-st.title("Text To Math Problem Solver Uing Google Gemma 2")
+# Initialize global variables
+llm = None
+assistant_agent = None
 
-groq_api_key=st.sidebar.text_input(label="Groq API Key",type="password")
+def initialize_agent_with_key(groq_api_key):
+    global llm, assistant_agent
 
+    # Initialize LLM
+    llm = ChatGroq(model="Gemma2-9b-It", groq_api_key=groq_api_key)
 
-if not groq_api_key:
-    st.info("Please add your Groq APPI key to continue")
-    st.stop()
+    # Wikipedia Tool
+    wikipedia_wrapper = WikipediaAPIWrapper()
+    wikipedia_tool = Tool(
+        name="Wikipedia",
+        func=wikipedia_wrapper.run,
+        description="A tool for searching the Internet to find the various information on the topics mentioned",
+    )
 
-llm=ChatGroq(model="Gemma2-9b-It",groq_api_key=groq_api_key)
+    # Math Tool
+    math_chain = LLMMathChain.from_llm(llm=llm)
+    calculator = Tool(
+        name="Calculator",
+        func=math_chain.run,
+        description="A tool for answering math related questions. Only input mathematical expressions need to be provided",
+    )
 
+    # Reasoning Tool
+    prompt = """
+    You are an agent tasked with solving users' mathematical questions. Logically arrive at the solution and provide a detailed explanation
+    and display it point-wise for the question below:
+    
+    Question: {question}
+    Answer:
+    """
+    prompt_template = PromptTemplate(
+        input_variables=["question"],
+        template=prompt
+    )
+    chain = LLMChain(llm=llm, prompt=prompt_template)
+    reasoning_tool = Tool(
+        name="Reasoning tool",
+        func=chain.run,
+        description="A tool for answering logic-based and reasoning questions.",
+    )
 
-## Initializing the tools
-wikipedia_wrapper=WikipediaAPIWrapper()
-wikipedia_tool=Tool(
-    name="Wikipedia",
-    func=wikipedia_wrapper.run,
-    description="A tool for searching the Internet to find the vatious information on the topics mentioned"
+    # Initialize the Agent
+    assistant_agent = initialize_agent(
+        tools=[wikipedia_tool, calculator, reasoning_tool],
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=False,
+        handle_parsing_errors=True,
+    )
 
-)
+def process_question(groq_api_key, question):
+    if not groq_api_key:
+        return "❗ Please enter your Groq API key."
 
-## Initializa the MAth tool
+    if not assistant_agent or not llm:
+        initialize_agent_with_key(groq_api_key)
 
-math_chain=LLMMathChain.from_llm(llm=llm)
-calculator=Tool(
-    name="Calculator",
-    func=math_chain.run,
-    description="A tools for answering math related questions. Only input mathematical expression need to bed provided"
-)
+    try:
+        response = assistant_agent.run(question)
+        return response
+    except Exception as e:
+        return f"❗ Error: {str(e)}"
 
-prompt="""
-Your a agent tasked for solving users mathemtical question. Logically arrive at the solution and provide a detailed explanation
-and display it point wise for the question below
-Question:{question}
-Answer:
-"""
+# Gradio Interface
+with gr.Blocks() as demo:
+    gr.Markdown("# 🧮 Text to Math Problem Solver with Wikipedia Search (Gemma2-9b-It)")
+    gr.Markdown("Solve mathematical problems with step-by-step reasoning and search information from Wikipedia.")
 
-prompt_template=PromptTemplate(
-    input_variables=["question"],
-    template=prompt
-)
+    groq_api_key = gr.Textbox(label="🔑 Groq API Key (Required)", type="password")
+    question = gr.Textbox(label="💬 Enter Your Question")
 
-## Combine all the tools into chain
-chain=LLMChain(llm=llm,prompt=prompt_template)
+    output = gr.Markdown()
 
-reasoning_tool=Tool(
-    name="Reasoning tool",
-    func=chain.run,
-    description="A tool for answering logic-based and reasoning questions."
-)
+    submit_btn = gr.Button("Generate Response")
 
-## initialize the agents
+    submit_btn.click(process_question, inputs=[groq_api_key, question], outputs=output)
 
-assistant_agent=initialize_agent(
-    tools=[wikipedia_tool,calculator,reasoning_tool],
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=False,
-    handle_parsing_errors=True
-)
-
-if "messages" not in st.session_state:
-    st.session_state["messages"]=[
-        {"role":"assistant","content":"Hi, I'm a MAth chatbot who can answer all your maths questions"}
-    ]
-
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg['content'])
-
-## LEts start the interaction
-# question=st.text_area("Enter youe question:","Lily has 5 boxes of marbles. Each box has 12 marbles. She gave 8 marbles to each of her 3 friends. How many marbles does Lily have left now?")
-question=st.chat_input("Enter Your Question")
-  # = 60 - 24 = 36)
-
-if question:
-    with st.spinner("Generate response.."):
-        st.session_state.messages.append({"role":"user","content":question})
-        st.chat_message("user").write(question)
-
-        st_cb=StreamlitCallbackHandler(st.container(),expand_new_thoughts=False)
-        response=assistant_agent.run(st.session_state.messages,callbacks=[st_cb]
-                                        )
-        st.session_state.messages.append({'role':'assistant',"content":response})
-        st.write('### Response:')
-        st.success(response)
-
-else:
-    st.warning("Please enter the question")
-
-
-
-
-
-
-
-
-
+demo.launch()
