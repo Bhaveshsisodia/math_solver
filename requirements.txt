@@ -50,3 +50,4 @@ numexpr
 huggingface_hub
 numexpr
 plotly
+gradio
