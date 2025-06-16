@@ -7,7 +7,7 @@ from langchain.chains import LLMMathChain, LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_community.utilities import WikipediaAPIWrapper
 import time
-#yes
+
 class GradioCallbackHandler(BaseCallbackHandler):
     def __init__(self):
         self.logs = []
